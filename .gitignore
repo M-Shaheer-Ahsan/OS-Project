@@ -1,0 +1,7 @@
+*.o
+*.out
+a.out
+build/
+compressor.exe
+*.bin
+compressed_output
