@@ -17,7 +17,7 @@ typedef struct {
 /* ratioo computation*/
 RatioReport ratio_compute(size_t original_bytes, size_t compressed_bytes);
 
-/* Print ratio report to stdout (used outside GUI) */
+/* Print ratio report to stdout  */
 void ratio_print(const RatioReport *r);
 
 /* Write ratio report to a file in apopned mode */
