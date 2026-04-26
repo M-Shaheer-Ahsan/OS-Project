@@ -7,6 +7,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <zlib.h>
+#include <unistd.h>
 
 ProgressStats g_stats = {0};
 
@@ -89,10 +90,28 @@ static void *compress_worker(void *arg) {
 
     sem_wait(&sem_slots);
 
+    int my_slot = -1;
+    pthread_mutex_lock(&stats_mutex);
+    for (int i = 0; i < 8; i++) {
+        if (g_stats.active_slots[i] == 0) {
+            g_stats.active_slots[i] = chunk->id + 1; // Mark as BUSY
+            my_slot = i;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&stats_mutex);
+
+    usleep(500000);
+
     uLongf bound = compressBound((uLong)chunk->original_size);
     unsigned char *out = malloc(bound);
     if (!out) {
         fprintf(stderr, "[compressor] malloc failed for chunk %d\n", chunk->id);
+        if (my_slot >= 0) {
+            pthread_mutex_lock(&stats_mutex);
+            g_stats.active_slots[my_slot] = 0;
+            pthread_mutex_unlock(&stats_mutex);
+        }
         sem_post(&sem_slots);
         return NULL;
     }
@@ -105,6 +124,11 @@ static void *compress_worker(void *arg) {
         fprintf(stderr, "[compressor] compress2 failed for chunk %d: %s\n",
                 chunk->id, zError(ret));
         free(out);
+        if (my_slot >= 0) {
+            pthread_mutex_lock(&stats_mutex);
+            g_stats.active_slots[my_slot] = 0;
+            pthread_mutex_unlock(&stats_mutex);
+        }
         sem_post(&sem_slots);
         return NULL;
     }
@@ -114,6 +138,10 @@ static void *compress_worker(void *arg) {
     chunk->compressed_size = (size_t)compressed_len;
 
     pthread_mutex_lock(&stats_mutex);
+    if (my_slot >= 0) {
+        g_stats.active_slots[my_slot] = 0; // Set back to IDLE
+    }
+    
     g_stats.chunks_done++;
     g_stats.total_original_bytes   += chunk->original_size;
     g_stats.total_compressed_bytes += chunk->compressed_size;

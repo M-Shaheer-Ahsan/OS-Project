@@ -7,7 +7,7 @@
 #include <time.h>
 #include <stdarg.h>
 #include <pthread.h>
-#include <ncurses.h>
+#include <ncurses/ncurses.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -25,7 +25,7 @@ static WINDOW *win_controls = NULL;
 
 #define TITLE_H     3
 #define STATS_H     6
-#define BAR_H       4
+#define BAR_H       12
 #define CONTROLS_H  3
 
 
@@ -110,26 +110,38 @@ static void draw_stats(int completed, int total, const RatioReport *r) {
     wrefresh(win_stats);
 }
 
-static void draw_progress_bar(int completed, int total) {
+static void draw_progress_bar(int completed, int total, const ProgressStats *s) {
     int cols = getmaxx(win_bar);
     int pct  = (total > 0) ? (completed * 100 / total) : 0;
 
     werase(win_bar);
     box(win_bar, 0, 0);
-    mvwprintw(win_bar, 0, 2, " Progress ");
+    mvwprintw(win_bar, 0, 2, " CPU Slots & Progress ");
+
+    for (int i = 0; i < 8; i++) {
+        mvwprintw(win_bar, i + 1, 2, "Slot %d: [", i + 1);
+        int active_id = s->active_slots[i];
+        if (active_id > 0) {
+            wattron(win_bar, COLOR_PAIR(4) | A_BOLD);
+            mvwprintw(win_bar, i + 1, 11, "BUSY - Chunk %03d", active_id - 1);
+            wattroff(win_bar, COLOR_PAIR(4) | A_BOLD);
+        } else {
+            mvwprintw(win_bar, i + 1, 11, "IDLE             ");
+        }
+        mvwprintw(win_bar, i + 1, 29, "]");
+    }
 
     int bar_width = cols - 12;
     if (bar_width < 4) bar_width = 4;
     int filled = (bar_width * pct) / 100;
 
-    mvwprintw(win_bar, 1, 2, "[");
+    mvwprintw(win_bar, 10, 2, "[");
     wattron(win_bar, COLOR_PAIR(3) | A_REVERSE);
-    for (int i = 0; i < filled; i++)
-        waddch(win_bar, ' ');
+    for (int i = 0; i < filled; i++) waddch(win_bar, ' ');
     wattroff(win_bar, COLOR_PAIR(3) | A_REVERSE);
-    for (int i = filled; i < bar_width; i++)
-        waddch(win_bar, '-');
-    mvwprintw(win_bar, 1, cols - 8, "] %3d%%", pct);
+    for (int i = filled; i < bar_width; i++) waddch(win_bar, '-');
+    mvwprintw(win_bar, 10, cols - 8, "] %3d%%", pct);
+
     wrefresh(win_bar);
 }
 
@@ -195,7 +207,7 @@ void gui_update(int completed, int total) {
 
     draw_title();
     draw_stats(completed, total, &r);
-    draw_progress_bar(completed, total);
+    draw_progress_bar(completed, total, &s);
     draw_log();
     draw_controls();
 

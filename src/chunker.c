@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "chunker.h"
 
-#define CHUNK_SIZE (1024 * 1024)
+#define CHUNK_SIZE (1024 * 1024 * 4)
 
 int chunk_file(const char *filename, Chunk **chunks, int *chunk_count) {
     FILE *file = fopen(filename, "rb");
@@ -66,5 +66,12 @@ int chunk_file(const char *filename, Chunk **chunks, int *chunk_count) {
 }
 
 void free_chunks(Chunk *chunks, int chunk_count) {
-    // TODO: Shaheer — free all chunk data buffers
+    if (!chunks) return;
+    for (int i = 0; i < chunk_count; i++) {
+        if (chunks[i].data) {
+            free(chunks[i].data);
+            chunks[i].data = NULL;
+        }
+    }
+    free(chunks);
 }

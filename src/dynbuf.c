@@ -1,51 +1,26 @@
 #include "dynbuf.h"
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 
-int dynbuf_init(DynBuf *buf, size_t initial_capacity) {
-    buf->data = malloc(initial_capacity);
-    if (!buf->data) {
-        fprintf(stderr, "[dynbuf] malloc failed\n");
-        return -1;
+void dynbuf_init(DynBuf *buf, int initial_capacity) {
+    buf->capacity = initial_capacity > 0 ? initial_capacity : 64;
+    buf->count = 0;
+    buf->lines = malloc(buf->capacity * sizeof(char*));
+}
+
+void dynbuf_append(DynBuf *buf, const char *line) {
+    if (buf->count >= buf->capacity) {
+        buf->capacity = (buf->capacity == 0) ? 64 : buf->capacity * 2;
+        buf->lines = realloc(buf->lines, buf->capacity * sizeof(char*));
     }
-    buf->size     = 0;
-    buf->capacity = initial_capacity;
-    return 0;
-}
-
-int dynbuf_reserve(DynBuf *buf, size_t capacity) {
-    if (capacity <= buf->capacity) return 0;
-
-    /* Double until large enough */
-    size_t new_cap = buf->capacity ? buf->capacity : 64;
-    while (new_cap < capacity)
-        new_cap *= 2;
-
-    unsigned char *tmp = realloc(buf->data, new_cap);
-    if (!tmp) {
-        fprintf(stderr, "[dynbuf] realloc failed\n");
-        return -1;
-    }
-    buf->data     = tmp;
-    buf->capacity = new_cap;
-    return 0;
-}
-
-int dynbuf_append(DynBuf *buf, const unsigned char *src, size_t len) {
-    if (dynbuf_reserve(buf, buf->size + len) != 0)
-        return -1;
-    memcpy(buf->data + buf->size, src, len);
-    buf->size += len;
-    return 0;
-}
-
-void dynbuf_reset(DynBuf *buf) {
-    buf->size = 0;
+    buf->lines[buf->count] = strdup(line);
+    buf->count++;
 }
 
 void dynbuf_free(DynBuf *buf) {
-    free(buf->data);
-    buf->data     = NULL;
-    buf->size     = buf->capacity = 0;
+    if (!buf->lines) return;
+    for (int i = 0; i < buf->count; i++) free(buf->lines[i]);
+    free(buf->lines);
+    buf->lines = NULL;
+    buf->count = buf->capacity = 0;
 }
